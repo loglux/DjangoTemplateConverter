@@ -65,7 +65,6 @@ if __name__ == '__main__':
 
 The project provides the following functionalities:
 
-- **Section Conversion**: Converts multi-word section names to single-word by removing spaces (e.g., `AboutUs Start`).
 - **Static Files Copy**: Copies all CSS, JS, and image files to the Django static folder.
 - **Template Creation**: Creates separate Django templates for each section and forms a main base template `base.html`.
 
