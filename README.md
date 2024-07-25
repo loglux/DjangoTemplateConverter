@@ -1,4 +1,4 @@
-# TemplateConverter
+# Django Template Converter
 
 ## Description
 
