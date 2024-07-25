@@ -171,7 +171,7 @@ class DjangoTemplateConverter:
 
         self.convert_to_django_templates()
 
-# Пример использования класса
+# Usage
 if __name__ == '__main__':
     app_name = 'portfolio'
     index_file = ('CryptoCoin-1.0.0/index.html')
