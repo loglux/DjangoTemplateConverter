@@ -120,22 +120,6 @@ class DjangoTemplateConverter:
                     self.sections[section_name]['end'] = i
                     print(f"Found section end: {section_name}")
 
-    def extract_section_(self, section_name):
-        start_comment = f'{section_name} Start'
-        end_comment = f'{section_name} End'
-        comments = self.soup.find_all(string=lambda text: isinstance(text, Comment))
-        start_idx = end_idx = -1
-        for i, comment in enumerate(comments):
-            if start_comment in comment:
-                start_idx = i
-            elif end_comment in comment:
-                end_idx = i
-        if start_idx != -1 and end_idx != -1:
-            elements = comments[start_idx].find_all_next(limit=(end_idx - start_idx))
-            section_content = ''.join(str(elem) for elem in elements)
-            return section_content
-        return ""
-
     def extract_section(self, section_name):
         start_comment = f'{section_name} Start'
         end_comment = f'{section_name} End'
