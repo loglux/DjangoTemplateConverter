@@ -20,7 +20,8 @@ class DjangoTemplateConverter:
         os.makedirs(self.template_dir, exist_ok=True)
 
     def sanitize_filename(self, filename):
-        return re.sub(r'[^\w\-_\.\/ ]', '_', filename)
+        # Replace invalid characters but preserve directory structure
+        return re.sub(r'[^\w\-_\.\/\\]', '_', filename)
 
     def read_index_file(self):
         with open(self.index_file, 'r', encoding='utf-8') as file:
@@ -59,29 +60,46 @@ class DjangoTemplateConverter:
     def scan_css_for_static_files(self, css_file_path, css_sanitized_name):
         with open(css_file_path, 'r', encoding='utf-8') as css_file:
             css_content = css_file.read()
-            urls = re.findall(r'url\(([^)]+)\)', css_content)
-            for url in urls:
-                url = url.strip('"').strip("'")
-                if not urlparse(url).scheme:  # Skip absolute URLs
-                    static_file_path = os.path.normpath(os.path.join(os.path.dirname(css_file_path), url))
-                    print(f"Found static file in CSS: {static_file_path}")
-                    if os.path.exists(static_file_path):
-                        sanitized_name = self.sanitize_filename(os.path.relpath(static_file_path, self.index_dir))
-                        new_path = os.path.normpath(os.path.join(self.static_dir, sanitized_name))
-                        print(f"Attempting to create directory: {os.path.dirname(new_path)}")
-                        os.makedirs(os.path.dirname(new_path), exist_ok=True)
-                        shutil.copy2(static_file_path, new_path)
-                        print(f"Copied {static_file_path} to {new_path}")
 
-                        # Update the CSS content with the new path
-                        new_url = f"{{% static '{self.app_name}/{sanitized_name}' %}}"
-                        css_content = css_content.replace(url, new_url)
+            # Regex to match URLs in various CSS properties, excluding gradient functions
+            css_content = re.sub(
+                r'url\(\s*["\']?(?!.*?(?:linear-gradient|radial-gradient|repeating-linear-gradient).*?)\s*(.*?)\s*["\']?\s*\)',
+                lambda match: self.replace_with_static(match, css_file_path),
+                css_content
+            )
+            # print("Updated CSS content:" + css_content)
 
-            # Write the updated CSS content back to the file
             updated_css_path = os.path.normpath(os.path.join(self.static_dir, css_sanitized_name))
             with open(updated_css_path, 'w', encoding='utf-8') as css_file:
                 css_file.write(css_content)
                 print(f"Updated CSS file written to: {updated_css_path}")
+
+    def replace_with_static(self, match, css_file_path):
+        url = match.group(1).strip()
+        if url.startswith(('http://', 'https://', 'data:', '#')):
+            # Ignore absolute URLs, data URIs, and fragment identifiers
+            return match.group(0)
+
+        static_image_path = os.path.normpath(os.path.join(os.path.dirname(css_file_path), url))
+        print(f"Found image URL in CSS: {static_image_path}")
+
+        if os.path.exists(static_image_path):
+            sanitized_name = self.sanitize_filename(os.path.relpath(static_image_path, self.index_dir))
+            new_path = os.path.normpath(os.path.join(self.static_dir, sanitized_name))
+            print("Debugging New path: " + new_path)
+            print("Debugging static image path: " + static_image_path)
+            os.makedirs(os.path.dirname(new_path), exist_ok=True)
+            shutil.copy2(static_image_path, new_path)
+            print(f"Copied {static_image_path} to {new_path}")
+            # relative_path = os.path.relpath(new_path, os.path.dirname(css_file_path)).replace("\\", "/")
+            # return f'url("{relative_path}")'
+            # returning URL that starts with /static/
+            # assert self.static_dir.endswith(app_name), f"Expected static_dir to end with app_name, but got {self.static_dir}"
+            relative_path = new_path.replace(self.static_dir, '/static/' + app_name).replace("\\", "/")
+            return f'url("{relative_path}")'
+        else:
+            print(f"Warning: {static_image_path} does not exist.")
+            return match.group(0)
 
     def analyze_template(self):
         comments = self.soup.find_all(string=lambda text: isinstance(text, Comment))
@@ -102,7 +120,7 @@ class DjangoTemplateConverter:
                     self.sections[section_name]['end'] = i
                     print(f"Found section end: {section_name}")
 
-    def extract_section(self, section_name):
+    def extract_section_(self, section_name):
         start_comment = f'{section_name} Start'
         end_comment = f'{section_name} End'
         comments = self.soup.find_all(string=lambda text: isinstance(text, Comment))
@@ -115,6 +133,27 @@ class DjangoTemplateConverter:
         if start_idx != -1 and end_idx != -1:
             elements = comments[start_idx].find_all_next(limit=(end_idx - start_idx))
             section_content = ''.join(str(elem) for elem in elements)
+            return section_content
+        return ""
+
+    def extract_section(self, section_name):
+        start_comment = f'{section_name} Start'
+        end_comment = f'{section_name} End'
+        comments = self.soup.find_all(string=lambda text: isinstance(text, Comment))
+        start_idx = -1
+        for i, comment in enumerate(comments):
+            if start_comment in comment:
+                start_idx = i
+                break
+        if start_idx != -1:
+            comment = comments[start_idx]
+            section_content = ''
+            while comment:
+                comment = comment.next_sibling
+                if comment and isinstance(comment, Comment) and end_comment in comment:
+                    break
+                if comment and not isinstance(comment, Comment):
+                    section_content += str(comment)
             return section_content
         return ""
 
@@ -174,6 +213,6 @@ class DjangoTemplateConverter:
 # Usage
 if __name__ == '__main__':
     app_name = 'portfolio'
-    index_file = ('CryptoCoin-1.0.0/index.html')
+    index_file = 'creative/index.html'
     converter = DjangoTemplateConverter(app_name, index_file)
     converter.run()
