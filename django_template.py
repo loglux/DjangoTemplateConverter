@@ -67,7 +67,9 @@ class DjangoTemplateConverter:
                 lambda match: self.replace_with_static(match, css_file_path),
                 css_content
             )
+
             # print("Updated CSS content:" + css_content)
+
 
             updated_css_path = os.path.normpath(os.path.join(self.static_dir, css_sanitized_name))
             with open(updated_css_path, 'w', encoding='utf-8') as css_file:
@@ -76,11 +78,17 @@ class DjangoTemplateConverter:
 
     def replace_with_static(self, match, css_file_path):
         url = match.group(1).strip()
+
         if url.startswith(('http://', 'https://', 'data:', '#')):
             # Ignore absolute URLs, data URIs, and fragment identifiers
             return match.group(0)
 
-        static_image_path = os.path.normpath(os.path.join(os.path.dirname(css_file_path), url))
+        # Разделяем URL на путь к файлу и параметры
+        url_parts = url.split('?', 1)
+        file_path = url_parts[0]
+        url_params = '?' + url_parts[1] if len(url_parts) > 1 else ''
+
+        static_image_path = os.path.normpath(os.path.join(os.path.dirname(css_file_path), file_path))
         print(f"Found image URL in CSS: {static_image_path}")
 
         if os.path.exists(static_image_path):
@@ -91,12 +99,9 @@ class DjangoTemplateConverter:
             os.makedirs(os.path.dirname(new_path), exist_ok=True)
             shutil.copy2(static_image_path, new_path)
             print(f"Copied {static_image_path} to {new_path}")
-            # relative_path = os.path.relpath(new_path, os.path.dirname(css_file_path)).replace("\\", "/")
-            # return f'url("{relative_path}")'
-            # returning URL that starts with /static/
-            # assert self.static_dir.endswith(app_name), f"Expected static_dir to end with app_name, but got {self.static_dir}"
             relative_path = new_path.replace(self.static_dir, '/static/' + app_name).replace("\\", "/")
-            return f'url("{relative_path}")'
+            # Возвращаем URL с сохранением параметров
+            return f'url("{relative_path}{url_params}")'
         else:
             print(f"Warning: {static_image_path} does not exist.")
             return match.group(0)
@@ -197,6 +202,6 @@ class DjangoTemplateConverter:
 # Usage
 if __name__ == '__main__':
     app_name = 'portfolio'
-    index_file = 'creative/index.html'
+    index_file = 'Kelly/index.html'
     converter = DjangoTemplateConverter(app_name, index_file)
     converter.run()
