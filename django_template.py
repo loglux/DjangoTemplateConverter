@@ -159,25 +159,37 @@ class DjangoTemplateConverter:
             content = f"{{% load static %}}\n{{% block {section_name.lower()} %}}\n{content}\n{{% endblock %}}"
             self.create_template_file(f'{section_name.lower()}.html', content)
 
-        # Create base template
+        # Create head template
         head_content = self.soup.head.prettify()
+        head_template = f"""
+        {{ %load static %}}
+        {head_content}
+        """
+        self.create_template_file('head.html', head_template)
+
+        # Create body scripts template
         body_scripts = [str(script) for script in self.soup.body.find_all('script')]
         body_script_tags = '\n'.join(body_scripts)
+        body_scripts_template = f"""
+        {{% load static %}}
+        {body_script_tags}
+        """
+        self.create_template_file('body_scripts.html', body_scripts_template)
 
-        base_template = f"""
+        # Create base template
+        base_template = """
         <!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="utf-8">
-            <title>{{% block title %}}Your Site Title{{% endblock %}}</title>
-            {{% load static %}}
-            {head_content}
+            <title>{% block title %}Your Site Title{% endblock %}</title>
+            {% include 'head.html' %}
         </head>
         <body>
-            {{% include 'navbar.html' %}}
-            {{% block content %}}{{% endblock %}}
-            {{% include 'footer.html' %}}
-            {body_script_tags}
+            {% include 'navbar.html' %}
+            {% block content %}{% endblock %}
+            {% include 'footer.html' %}
+            {% include 'body_scripts.html' %}
         </body>
         </html>
         """

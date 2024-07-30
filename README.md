@@ -44,6 +44,13 @@ Make sure you have the following dependencies installed:
    <div>Footer Content</div>
    <!-- Footer End -->
    ```
+It is recommended to combine the header and navbar into the same template called navbar, enclosing the necessary parts of the header and navbar within the same comments:
+```html
+<!-- Navbar Start -->
+<div>Header Content</div>
+<div>Navbar Content</div>
+<!-- Navbar End -->
+```
 
 2. Run the script `django_template.py` by specifying the Django app name and the path to your HTML file:
    ```sh
