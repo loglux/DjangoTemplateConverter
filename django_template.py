@@ -15,6 +15,7 @@ class DjangoTemplateConverter:
         self.setup_directories()
         self.soup = None
         self.sections = {}
+        self.menu_items = set()  # To keep menu items
 
     def setup_directories(self):
         os.makedirs(self.static_dir, exist_ok=True)
@@ -96,7 +97,7 @@ class DjangoTemplateConverter:
             os.makedirs(os.path.dirname(new_path), exist_ok=True)
             shutil.copy2(static_image_path, new_path)
             print(f"Copied {static_image_path} to {new_path}")
-            relative_path = new_path.replace(self.static_dir, '/static/' + app_name).replace("\\", "/")
+            relative_path = new_path.replace(self.static_dir, '/static/' + self.app_name).replace("\\", "/")
             # Return URL with parameters preserved
             return f'url("{relative_path}{url_params}")'
         else:
@@ -158,7 +159,7 @@ class DjangoTemplateConverter:
 
         # Create head template
         head_content = self.soup.head.prettify()
-        head_template = f"""{{ %load static %}}\n{head_content}"""
+        head_template = f"""{{% load static %}}\n{head_content}"""
         self.create_template_file('head.html', head_template)
 
         # Create body scripts template
@@ -185,7 +186,6 @@ class DjangoTemplateConverter:
 </html>
 """
         self.create_template_file('base.html', base_template)
-
         # Create index template
         index_content = "{% extends 'base.html' %}\n{% block content %}\n"
         for section_name in self.sections:
@@ -194,12 +194,92 @@ class DjangoTemplateConverter:
         index_content += "{% endblock %}\n"
         self.create_template_file('index.html', index_content)
 
+    def update_navbar_links(self):
+        """
+        Updates links in the navbar.html file.
+        """
+        # Path to the navbar.html file
+        navbar_file_path = os.path.join(self.template_dir, 'navbar.html')
+        # Check if the file exists
+        if not os.path.exists(navbar_file_path):
+            print(f"File {navbar_file_path} does not exist.")
+            return
+        try:
+            # Read the content of the file
+            with open(navbar_file_path, 'r', encoding='utf-8') as file:
+                content = file.read()
+            # Update the links
+            updated_content = self.update_navbar_links_in_content(content)
+            # Write the updated content back to the file
+            # Utilising the create_template_file method
+            self.create_template_file('navbar.html', updated_content)
+            print(f"Updated navbar links in {navbar_file_path}")
+        except IOError as e:
+            print(f"An error occurred while processing the file: {e}")
+
+    def update_navbar_links_in_content(self, content):
+        """
+        Update links in the passed content.
+        Save the original link (like index.html, about.html, etc) in the self.menu_items list.
+        """
+        def replace_href(match):
+            href = match.group(1).strip()
+            if href.endswith('.html'):
+                name = href.rsplit('.', 1)[0]  # Remove ".html" from the link
+                new_href = f'href="{{% url \'{name}\' %}}"'
+                print(f"Replacing: href=\"{href}\" with {new_href}")
+                self.menu_items.add(href)  # Save the original links to self.menu_items
+                return new_href
+            return match.group(0)
+        # Update only links that end with .html
+        updated_content = re.sub(r'href="([^"]+\.html)"', replace_href, content)
+        return updated_content
+
+    def create_urls_file(self):
+        urls_content = \
+f"""from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.index, name='index'),
+"""
+        for menu_item_name in self.menu_items:
+            if menu_item_name != 'index.html':
+                urls_content += f"    path('{menu_item_name.lower().replace('.html', '')}/', views.{menu_item_name.lower().replace('.html', '')}, name='{menu_item_name.lower().replace('.html', '')}'),\n"
+
+        urls_content += "]\n"
+        urls_file = os.path.join(self.app_name, 'urls.py')
+        with open(urls_file, 'w', encoding='utf-8') as file:
+            file.write(urls_content)
+        print(f"URLs configuration written to: {urls_file}")
+
+    def create_views_file(self):
+        views_content = \
+f"""from django.shortcuts import render
+
+#def index(request):
+#    return render(request, '{self.app_name}/index.html')
+"""
+        for menu_item_name in self.menu_items:
+            views_content += f"""
+def {menu_item_name.lower().replace('.html', '')}(request):
+    return render(request, '{menu_item_name.lower()}')
+"""
+        views_file = os.path.join(self.app_name, 'views.py')
+        with open(views_file, 'w', encoding='utf-8') as file:
+            file.write(views_content)
+        print(f"Views configuration written to: {views_file}")
+
     def run(self):
         self.read_index_file()
         self.find_and_copy_static_files()
         self.analyze_template()
         print(f"Template analysis complete. Sections found: {self.sections}")
         self.convert_to_django_templates()
+        self.update_navbar_links()
+        self.create_urls_file()
+        self.create_views_file()
+        print(self.menu_items)
 
 # Usage
 if __name__ == '__main__':
