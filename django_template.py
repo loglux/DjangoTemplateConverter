@@ -4,6 +4,7 @@ import shutil
 from bs4 import BeautifulSoup, Comment
 from urllib.parse import urlparse
 
+
 class DjangoTemplateConverter:
     def __init__(self, app_name, index_file):
         self.app_name = app_name
@@ -67,10 +68,6 @@ class DjangoTemplateConverter:
                 lambda match: self.replace_with_static(match, css_file_path),
                 css_content
             )
-
-            # print("Updated CSS content:" + css_content)
-
-
             updated_css_path = os.path.normpath(os.path.join(self.static_dir, css_sanitized_name))
             with open(updated_css_path, 'w', encoding='utf-8') as css_file:
                 css_file.write(css_content)
@@ -83,7 +80,7 @@ class DjangoTemplateConverter:
             # Ignore absolute URLs, data URIs, and fragment identifiers
             return match.group(0)
 
-        # Разделяем URL на путь к файлу и параметры
+        # Split URL into file path and parameters
         url_parts = url.split('?', 1)
         file_path = url_parts[0]
         url_params = '?' + url_parts[1] if len(url_parts) > 1 else ''
@@ -100,7 +97,7 @@ class DjangoTemplateConverter:
             shutil.copy2(static_image_path, new_path)
             print(f"Copied {static_image_path} to {new_path}")
             relative_path = new_path.replace(self.static_dir, '/static/' + app_name).replace("\\", "/")
-            # Возвращаем URL с сохранением параметров
+            # Return URL with parameters preserved
             return f'url("{relative_path}{url_params}")'
         else:
             print(f"Warning: {static_image_path} does not exist.")
@@ -161,38 +158,32 @@ class DjangoTemplateConverter:
 
         # Create head template
         head_content = self.soup.head.prettify()
-        head_template = f"""
-        {{ %load static %}}
-        {head_content}
-        """
+        head_template = f"""{{ %load static %}}\n{head_content}"""
         self.create_template_file('head.html', head_template)
 
         # Create body scripts template
         body_scripts = [str(script) for script in self.soup.body.find_all('script')]
         body_script_tags = '\n'.join(body_scripts)
-        body_scripts_template = f"""
-        {{% load static %}}
-        {body_script_tags}
-        """
+        body_scripts_template = f"""{{% load static %}}\n{body_script_tags}"""
         self.create_template_file('body_scripts.html', body_scripts_template)
 
         # Create base template
-        base_template = """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="utf-8">
-            <title>{% block title %}Your Site Title{% endblock %}</title>
-            {% include 'head.html' %}
-        </head>
-        <body>
-            {% include 'navbar.html' %}
-            {% block content %}{% endblock %}
-            {% include 'footer.html' %}
-            {% include 'body_scripts.html' %}
-        </body>
-        </html>
-        """
+        base_template = \
+"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}Your Site Title{% endblock %}</title>
+    {% include 'head.html' %}
+</head>
+<body>
+    {% include 'navbar.html' %}
+    {% block content %}{% endblock %}
+    {% include 'footer.html' %}
+    {% include 'body_scripts.html' %}
+</body>
+</html>
+"""
         self.create_template_file('base.html', base_template)
 
         # Create index template
@@ -208,7 +199,6 @@ class DjangoTemplateConverter:
         self.find_and_copy_static_files()
         self.analyze_template()
         print(f"Template analysis complete. Sections found: {self.sections}")
-
         self.convert_to_django_templates()
 
 # Usage
