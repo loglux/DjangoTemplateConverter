@@ -12,7 +12,7 @@
 - **URLs Configuration**: Automatically generates a `urls.py` file based on the sections identified in the HTML.
 - **Views Creation**: Creates a `views.py` file with a view function for each section.
 - **Additional HTML File Processing**: Processes additional HTML files in the index directory, converting them into Django templates. Note that the method does not remove duplicate sections like the navbar or footer. These should be manually consolidated to prevent duplication in the final Django application.
-- 
+
 ## Installation and Usage
 
 ### Dependencies
