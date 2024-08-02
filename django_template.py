@@ -270,16 +270,55 @@ def {menu_item_name.lower().replace('.html', '')}(request):
             file.write(views_content)
         print(f"Views configuration written to: {views_file}")
 
+
+    def process_additional_files(self):
+        """
+        Process additional HTML files in the index directory that are not the main index file.
+
+        - This method scans for all HTML files in the specified index directory except the index file itself.
+        - It checks if a corresponding Django template file already exists in the template directory.
+          If it does, the method skips processing to avoid redundancy.
+        - For each additional HTML file, it reads the file, processes and copies any static files (CSS, JS, images)
+          that are referenced, and saves the resulting content to the Django template directory.
+        - This helps ensure all relevant HTML files are converted into Django templates efficiently.
+        """
+        # Find all HTML files in the index directory except the index file
+        additional_files = [os.path.join(root, file)
+                            for root, _, files in os.walk(self.index_dir)
+                            for file in files if file.endswith('.html') and file != os.path.basename(self.index_file)]
+
+        for file in additional_files:
+            template_file_name = os.path.basename(file)
+            template_path = os.path.join(self.template_dir, template_file_name)
+
+            if os.path.exists(template_path):
+                print(f"Skipping existing file: {template_path}")
+                continue
+
+            with open(file, 'r', encoding='utf-8') as f:
+                soup = BeautifulSoup(f, 'html.parser')
+            self.soup = soup
+            self.find_and_copy_static_files()
+
+            # Save the updated content to the Django template directory
+            with open(template_path, 'w', encoding='utf-8') as f:
+                f.write(str(soup))
+            print(f"Processed additional file: {template_file_name}")
+
     def run(self):
         self.read_index_file()
         self.find_and_copy_static_files()
         self.analyze_template()
         print(f"Template analysis complete. Sections found: {self.sections}")
         self.convert_to_django_templates()
+        # Update navbar links
         self.update_navbar_links()
+        # Create URLs and views files
         self.create_urls_file()
         self.create_views_file()
         print(self.menu_items)
+        # Process additional HTML files, copying static files and updating links
+        self.process_additional_files()
 
 # Usage
 if __name__ == '__main__':
